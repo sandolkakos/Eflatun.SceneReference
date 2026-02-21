@@ -100,7 +100,7 @@ var sceneBuildIndex = mySceneReference.BuildIndex;
 var sceneName = mySceneReference.Name;
 
 // You can only access these when the scene is currently loaded
-var loadedScene = mySceneReference.LoadedScene
+var loadedScene = mySceneReference.LoadedScene;
 
 // You can only access these if you have addressables support enabled
 var sceneAddress = mySceneReference.Address;
@@ -161,6 +161,60 @@ if (mySceneReference.UnsafeReason == SceneReferenceUnsafeReason.NotInBuild)
 > [!IMPORTANT]<br/>
 > - `Empty` has priority over all other reasons.
 > - `NotInMaps` has priority over `NotInBuild`.
+
+## `TryGet` Methods
+
+Each property that can throw exceptions based on state has a corresponding `TryGet` method. You can opt to call the `TryGet` methods as an alternative to performing validation prior to accessing those properties.
+
+```cs
+if (mySceneReference.TryGetPath(out var path))
+{
+    // `path` contains the value of `mySceneReference.Path`.
+}
+else
+{
+    // `mySceneReference.Path` would throw an exception.
+}
+
+if (mySceneReference.TryGetBuildIndex(out var buildIndex))
+{
+    // `buildIndex` contains the value of `mySceneReference.BuildIndex`.
+}
+else
+{
+    // `mySceneReference.BuildIndex` would throw an exception.
+}
+
+if (mySceneReference.TryGetName(out var name))
+{
+    // `name` contains the value of `mySceneReference.Name`.
+}
+else
+{
+    // `mySceneReference.Name` would throw an exception.
+}
+
+if (mySceneReference.TryGetLoadedScene(out var loadedScene))
+{
+    // `loadedScene` contains the value of `mySceneReference.LoadedScene`.
+}
+else
+{
+    // `mySceneReference.LoadedScene` would throw an exception.
+}
+
+if (mySceneReference.TryGetAddress(out var address))
+{
+    // `address` contains the value of `mySceneReference.Address`.
+}
+else
+{
+    // `mySceneReference.Address` would throw an exception.
+}
+```
+
+> [!IMPORTANT]<br/>
+> `TryGetAddress` method, just like the `Address` property, throws `AddressablesSupportDisabledException` if addressables support is disabled.
 
 ## Inline Inspector Utilities
 
