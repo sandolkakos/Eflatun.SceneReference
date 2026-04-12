@@ -23,7 +23,7 @@ namespace Eflatun.SceneReference
     [PublicAPI]
     [Serializable]
     [XmlRoot(XmlRootElementName)]
-    public class SceneReference : ISerializationCallbackReceiver, ISerializable, IXmlSerializable
+    public class SceneReference : ISerializationCallbackReceiver, ISerializable, IXmlSerializable, IEquatable<SceneReference>
     {
         internal const string XmlRootElementName = "Eflatun.SceneReference.SceneReference";
         internal const string CustomSerializationGuidKey = "sceneAssetGuidHex";
@@ -40,8 +40,9 @@ namespace Eflatun.SceneReference
         /// <remarks>This constructor never throws.</remarks>
         public SceneReference()
         {
-            // This parameterless constructor is required for the custom XML serialization support.
-            // See: https://learn.microsoft.com/en-us/dotnet/api/system.xml.serialization.ixmlserializable?view=net-7.0#remarks
+            /* This parameterless constructor is required for the System.Xml serialization support.
+             * See: https://learn.microsoft.com/en-us/dotnet/api/system.xml.serialization.ixmlserializable?view=net-7.0#remarks
+             */
 
             guid = Utils.AllZeroGuid;
             asset = null;
@@ -225,7 +226,8 @@ namespace Eflatun.SceneReference
                     throw SceneReferenceInternalException.InvalidGuid("54783205", Guid);
                 }
 
-                return Guid != Utils.AllZeroGuid;
+                // AllZeroGuid is all zeros, casing is irrelevant. The only reason we are using OrdinalIgnoreCase here is consistency.
+                return !StringComparer.OrdinalIgnoreCase.Equals(Guid, Utils.AllZeroGuid);
             }
         }
 
@@ -239,6 +241,7 @@ namespace Eflatun.SceneReference
         /// </summary>
         /// <exception cref="EmptySceneReferenceException">Throws if nothing is assigned to this SceneReference.</exception>
         /// <exception cref="InvalidSceneReferenceException">Throws if the scene is not in the scene GUID to path map.</exception>
+        /// <seealso cref="TryGetPath"/>
         public string Path
         {
             get
@@ -265,6 +268,7 @@ namespace Eflatun.SceneReference
         /// <remarks>
         /// This property will return <c>-1</c> if the scene is not added and enabled in the build settings.
         /// </remarks>
+        /// <seealso cref="TryGetBuildIndex"/>
         public int BuildIndex => SceneUtility.GetBuildIndexByScenePath(Path);
 
         /// <summary>
@@ -272,6 +276,7 @@ namespace Eflatun.SceneReference
         /// </summary>
         /// <exception cref="EmptySceneReferenceException">Throws if nothing is assigned to this SceneReference.</exception>
         /// <exception cref="InvalidSceneReferenceException">Throws if the scene is not in the scene GUID to path map.</exception>
+        /// <seealso cref="TryGetName"/>
         public string Name => System.IO.Path.GetFileNameWithoutExtension(Path);
 
         /// <summary>
@@ -282,6 +287,7 @@ namespace Eflatun.SceneReference
         /// <remarks>
         /// You can check <see cref="Scene.IsValid"/> on the return value to see if it is valid.
         /// </remarks>
+        /// <seealso cref="TryGetLoadedScene"/>
         public Scene LoadedScene => SceneManager.GetSceneByPath(Path);
 
         /// <summary>
@@ -291,6 +297,7 @@ namespace Eflatun.SceneReference
         /// <exception cref="InvalidSceneReferenceException">Throws if the scene is not in the scene GUID to path map.</exception>
         /// <exception cref="SceneNotAddressableException">Throws if the scene is not in the scene GUID to address map.</exception>
         /// <exception cref="AddressablesSupportDisabledException">Throws if addressables support is disabled.</exception>
+        /// <seealso cref="TryGetAddress"/>
         public string Address
         {
             get
@@ -375,6 +382,141 @@ namespace Eflatun.SceneReference
             }
         }
 
+        /// <summary>
+        /// Tries to get the path to the scene asset.
+        /// </summary>
+        /// <param name="path">The path to the scene asset if the return value is <c>true</c>. <c>null</c> otherwise.</param>
+        /// <returns>
+        /// <c>true</c> if both of the following are true, <c>false</c> otherwise.
+        /// <list type="number">
+        /// <item>A scene is assigned to this <see cref="SceneReference"/>.</item>
+        /// <item>The scene is in the scene GUID to path map.</item>
+        /// </list>
+        /// </returns>
+        /// <seealso cref="Path"/>
+        [ContractAnnotation("=> true, path:notnull; => false, path:null")]
+        public bool TryGetPath(out string path)
+        {
+            if (HasValue && SceneGuidToPathMapProvider.SceneGuidToPathMap.TryGetValue(Guid, out path))
+            {
+                return true;
+            }
+
+            path = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Tries to get the build index of the scene.
+        /// </summary>
+        /// <param name="buildIndex">The build index of the scene if the return value is <c>true</c>. <c>-1</c> otherwise.</param>
+        /// <returns>
+        /// <c>true</c> if both of the following are true, <c>false</c> otherwise.
+        /// <list type="number">
+        /// <item>A scene is assigned to this <see cref="SceneReference"/>.</item>
+        /// <item>The scene is in the scene GUID to path map.</item>
+        /// </list>
+        /// </returns>
+        /// <remarks>
+        /// <paramref name="buildIndex"/> will be <c>-1</c> even when the return value is <c>true</c> if the scene is not added and enabled in the build settings.
+        /// </remarks>
+        /// <seealso cref="BuildIndex"/>
+        public bool TryGetBuildIndex(out int buildIndex)
+        {
+            if (TryGetPath(out var path))
+            {
+                buildIndex = SceneUtility.GetBuildIndexByScenePath(path);
+                return true;
+            }
+
+            buildIndex = -1;
+            return false;
+        }
+
+        /// <summary>
+        /// Tries to get the name of the scene asset.
+        /// </summary>
+        /// <param name="name">The name of the scene asset if the return value is <c>true</c>. <c>null</c> otherwise.</param>
+        /// <returns>
+        /// <c>true</c> if both of the following are true, <c>false</c> otherwise.
+        /// <list type="number">
+        /// <item>A scene is assigned to this <see cref="SceneReference"/>.</item>
+        /// <item>The scene is in the scene GUID to path map.</item>
+        /// </list>
+        /// </returns>
+        /// <remarks>
+        /// The <paramref name="name"/> will not have the <c>.unity</c> extension.
+        /// </remarks>
+        /// <seealso cref="Name"/>
+        [ContractAnnotation("=> true, name:notnull; => false, name:null")]
+        public bool TryGetName(out string name)
+        {
+            if (TryGetPath(out var path))
+            {
+                name = System.IO.Path.GetFileNameWithoutExtension(path);
+                return true;
+            }
+
+            name = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Tries to get the <see cref="Scene"/> struct of the scene.
+        /// </summary>
+        /// <param name="loadedScene">The <see cref="Scene"/> struct of the scene if the return value is <c>true</c>. <c>default</c> otherwise.</param>
+        /// <returns>
+        /// <c>true</c> if both of the following are true, <c>false</c> otherwise.
+        /// <list type="number">
+        /// <item>A scene is assigned to this <see cref="SceneReference"/>.</item>
+        /// <item>The scene is in the scene GUID to path map.</item>
+        /// </list>
+        /// </returns>
+        /// <remarks>
+        /// The <paramref name="loadedScene"/> will be invalid even when the return value is <c>true</c> if the scene is not currently loaded. You can check <see cref="Scene.IsValid"/> to see if it is valid.
+        /// </remarks>
+        /// <seealso cref="LoadedScene"/>
+        public bool TryGetLoadedScene(out Scene loadedScene)
+        {
+            if (TryGetPath(out var path))
+            {
+                loadedScene = SceneManager.GetSceneByPath(path);
+                return true;
+            }
+
+            loadedScene = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Tries to get the address of the scene.
+        /// </summary>
+        /// <param name="address">The address of the scene if the return value is <c>true</c>. <c>null</c> otherwise.</param>
+        /// <returns>
+        /// <c>true</c> if both of the following are true, <c>false</c> otherwise.
+        /// <list type="number">
+        /// <item>A scene is assigned to this <see cref="SceneReference"/>.</item>
+        /// <item>The scene is in the scene GUID to address map.</item>
+        /// </list>
+        /// </returns>
+        /// <exception cref="AddressablesSupportDisabledException">Throws if addressables support is disabled.</exception>
+        /// <seealso cref="Address"/>
+        [ContractAnnotation("=> true, address:notnull; => false, address:null")]
+        public bool TryGetAddress(out string address)
+        {
+#if ESR_ADDRESSABLES
+            if (HasValue && SceneGuidToAddressMapProvider.SceneGuidToAddressMap.TryGetValue(Guid, out address))
+            {
+                return true;
+            }
+
+            address = null;
+            return false;
+#else // ESR_ADDRESSABLES
+            throw new AddressablesSupportDisabledException();
+#endif // ESR_ADDRESSABLES
+        }
+
         /// <inheritdoc cref="GetObjectData(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)"/>
         void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -382,7 +524,7 @@ namespace Eflatun.SceneReference
         }
 
         /// <summary>
-        /// Used by <see cref="ISerializable"/> for custom JSON and Binary serialization support.
+        /// Used by <see cref="ISerializable"/> for Newtonsoft.Json and BinaryFormatter serialization support.
         /// </summary>
         /// <remarks>
         /// https://www.newtonsoft.com/json/help/html/serializationguide.htm#ISerializable
@@ -430,7 +572,7 @@ namespace Eflatun.SceneReference
         }
 
         /// <summary>
-        /// Used by <see cref="IXmlSerializable"/> for custom XML serialization support.
+        /// Used by <see cref="IXmlSerializable"/> for System.Xml serialization support.
         /// </summary>
         protected virtual XmlSchema GetSchema()
         {
@@ -444,7 +586,7 @@ namespace Eflatun.SceneReference
         }
 
         /// <summary>
-        /// Used by <see cref="IXmlSerializable"/> for custom XML serialization support.
+        /// Used by <see cref="IXmlSerializable"/> for System.Xml serialization support.
         /// </summary>
         protected virtual void ReadXml(XmlReader reader)
         {
@@ -459,7 +601,7 @@ namespace Eflatun.SceneReference
         }
 
         /// <summary>
-        /// Used by <see cref="IXmlSerializable"/> for custom XML serialization support.
+        /// Used by <see cref="IXmlSerializable"/> for System.Xml serialization support.
         /// </summary>
         protected virtual void WriteXml(XmlWriter writer)
         {
@@ -483,5 +625,20 @@ namespace Eflatun.SceneReference
                 : null;
 #endif // UNITY_EDITOR
         }
+
+        public bool Equals(SceneReference other) =>
+            StringComparer.OrdinalIgnoreCase.Equals(Guid, other?.Guid);
+
+        public override bool Equals(object other) =>
+            Equals(other as SceneReference);
+
+        public override int GetHashCode() =>
+            StringComparer.OrdinalIgnoreCase.GetHashCode(Guid);
+
+        public static bool operator ==(SceneReference left, SceneReference right) =>
+            Equals(left, right);
+
+        public static bool operator !=(SceneReference left, SceneReference right) =>
+            !Equals(left, right);
     }
 }

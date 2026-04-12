@@ -49,8 +49,32 @@ namespace Eflatun.SceneReference.Utility
         /// <summary>
         /// Returns if the given <paramref name="guid"/> is valid. A valid GUID is 32 chars of hexadecimals.
         /// </summary>
-        public static bool IsValidGuid(this string guid) =>
-            guid.Length == 32 && guid.ToUpper().All("0123456789ABCDEF".Contains);
+        public static bool IsValidGuid(this string guid)
+        {
+            if (guid.Length != 32)
+            {
+                return false;
+            }
+
+            // ReSharper disable once ForCanBeConvertedToForeach
+            // ReSharper disable once LoopCanBeConvertedToQuery
+            for (var i = 0; i < guid.Length; i++)
+            {
+                var guidChar = guid[i];
+
+                var isGuidCharHexadecimal =
+                    ('0' <= guidChar && guidChar <= '9') ||
+                    ('A' <= guidChar && guidChar <= 'F') ||
+                    ('a' <= guidChar && guidChar <= 'f');
+
+                if (!isGuidCharHexadecimal)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
 
         /// <summary>
         /// If the given GUID is null or whitespace returns <see cref="AllZeroGuid"/>. Otherwise returns as-is.
@@ -73,13 +97,13 @@ namespace Eflatun.SceneReference.Utility
         /// <summary>
         /// Convert <see cref="IReadOnlyDictionary{TKey, TValue}"/> to <see cref="Dictionary{TKey, TValue}"/>.
         /// </summary>
-        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IReadOnlyDictionary<TKey, TValue> readOnly)
+        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IReadOnlyDictionary<TKey, TValue> readOnly, IEqualityComparer<TKey> comparer)
         {
 // Backwards compatibility: Dictionary did not have a constructor that took in an IReadOnlyDictionary for Unity versions before 2021.3.
 #if UNITY_2021_3_OR_NEWER
-            return new Dictionary<TKey, TValue>(readOnly);
+            return new Dictionary<TKey, TValue>(readOnly, comparer);
 #else
-            return readOnly.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            return readOnly.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, comparer);
 #endif
         }
     }
