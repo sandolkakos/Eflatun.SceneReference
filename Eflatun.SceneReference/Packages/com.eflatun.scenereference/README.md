@@ -51,13 +51,13 @@ openupm add com.eflatun.scenereference
 
 ### With Git URL
 
-Add the following line to the `dependencies` section of your project's `manifest.json` file. Replace `4.1.1` with the version you want to install.
+Add the following line to the `dependencies` section of your project's `manifest.json` file. Replace `5.0.0` with the version you want to install.
 
 ```json
-"com.eflatun.scenereference": "git+https://github.com/starikcetin/Eflatun.SceneReference.git#4.1.1"
+"com.eflatun.scenereference": "git+https://github.com/starikcetin/Eflatun.SceneReference.git#5.0.0"
 ```
 
-_Although it is highly discouraged, you can replace `4.1.1` with `upm` to get the latest version instead of a specific one._
+_Although it is highly discouraged, you can replace `5.0.0` with `upm` to get the latest version instead of a specific one._
 
 ## Optional Dependencies
 
@@ -100,7 +100,7 @@ var sceneBuildIndex = mySceneReference.BuildIndex;
 var sceneName = mySceneReference.Name;
 
 // You can only access these when the scene is currently loaded
-var loadedScene = mySceneReference.LoadedScene
+var loadedScene = mySceneReference.LoadedScene;
 
 // You can only access these if you have addressables support enabled
 var sceneAddress = mySceneReference.Address;
@@ -161,6 +161,60 @@ if (mySceneReference.UnsafeReason == SceneReferenceUnsafeReason.NotInBuild)
 > [!IMPORTANT]<br/>
 > - `Empty` has priority over all other reasons.
 > - `NotInMaps` has priority over `NotInBuild`.
+
+## `TryGet` Methods
+
+Each property that can throw exceptions based on state has a corresponding `TryGet` method. You can opt to call the `TryGet` methods as an alternative to performing validation prior to accessing those properties.
+
+```cs
+if (mySceneReference.TryGetPath(out var path))
+{
+    // `path` contains the value of `mySceneReference.Path`.
+}
+else
+{
+    // `mySceneReference.Path` would throw an exception.
+}
+
+if (mySceneReference.TryGetBuildIndex(out var buildIndex))
+{
+    // `buildIndex` contains the value of `mySceneReference.BuildIndex`.
+}
+else
+{
+    // `mySceneReference.BuildIndex` would throw an exception.
+}
+
+if (mySceneReference.TryGetName(out var name))
+{
+    // `name` contains the value of `mySceneReference.Name`.
+}
+else
+{
+    // `mySceneReference.Name` would throw an exception.
+}
+
+if (mySceneReference.TryGetLoadedScene(out var loadedScene))
+{
+    // `loadedScene` contains the value of `mySceneReference.LoadedScene`.
+}
+else
+{
+    // `mySceneReference.LoadedScene` would throw an exception.
+}
+
+if (mySceneReference.TryGetAddress(out var address))
+{
+    // `address` contains the value of `mySceneReference.Address`.
+}
+else
+{
+    // `mySceneReference.Address` would throw an exception.
+}
+```
+
+> [!IMPORTANT]<br/>
+> `TryGetAddress` method, just like the `Address` property, throws `AddressablesSupportDisabledException` if addressables support is disabled.
 
 ## Inline Inspector Utilities
 
@@ -680,6 +734,97 @@ public class SceneLoader : MonoBehaviour
 ```
 
 In the screenshot, the `OnClick` event of the button is being listened by the `Raise` method of the adapter. The `Raised` event of the adapter is being listened by the `LoadScene` method of the scene loader class. Notice the `Scene` serialized field on the adapter. The `scene` parameter of `LoadScene` method of the scene loader class is filled with the `Scene` serialized field of the adapter. This way, while we are unable to wire `LoadScene` and `OnClick` directly together, we can wire them through the `SceneReferenceUnityEventAdapter` class acting as a middleman.
+
+## Usage in Editor Code
+
+Depending on the visibility of your field, you have different options on how to display, get, and set a field of type `Eflatun.SceneReference` in your editor code.
+
+Let's assume we have the following `MonoBehaviour` that we are writing a custom editor for:
+
+```cs
+public class CustomEditorUsageDemo : MonoBehaviour
+{
+    public SceneReference PublicScene;
+    [SerializeField] private SceneReference privateScene;
+}
+```
+
+> [!WARNING]<br/>
+> `SerializedProperty.objectReferenceValue` can not be used with fields of type `SceneReference`. You will get the `type is not a supported pptr value` exception if you try. This is because `SerializedProperty.objectReferenceValue` only works with `UnityEngine.Object` types. `SceneReference` does not fit that description, it is a regular C# class.
+
+### `EditorGUILayout.PropertyField`
+
+Use this option if you do not care about the underlying data, and want to let `SceneReference` field do its thing.
+
+```cs
+var serializedProp = serializedObject.FindProperty("privateScene");
+EditorGUILayout.PropertyField(serializedProp);
+```
+
+> [!TIP]<br/>
+> `serializedObject` is a field of the `Editor` class. See [here](https://docs.unity3d.com/ScriptReference/Editor-serializedObject.html) for documentation.
+
+> [!TIP]<br/>
+> If you are get an `Unsupported type SceneReference` error, try reserializing the asset that is holding the `SceneReference` field. There are no official Unity responses regarding this. We are speculating that this error stems from outdated serialization data. See [here](https://github.com/starikcetin/Eflatun.SceneReference/issues/108#issuecomment-2501821101).
+
+### Direct Access
+
+Use this option if:
+1. You need to get or set the underlying `SceneReference` instance of the field yourself.
+2. The field is visible to your editor code.
+
+```cs
+var targetCasted = (CustomEditorUsageDemo)target;
+
+// read
+var value = targetCasted.PublicScene;
+
+// write
+targetCasted.PublicScene = SceneReference.FromScenePath(_newPathPublicSceneDirect);
+```
+
+> [!TIP]<br/>
+> `target` is a field of the `Editor` class. See [here](https://docs.unity3d.com/ScriptReference/Editor-target.html) for documentation.
+
+### `SerializedProperty.boxedValue`
+
+> [!NOTE]<br/>
+> `SerializedProperty.boxedValue` is only available in Unity 2022.1 and newer.
+
+Use this option if:
+1. You need to get or set the underlying `SceneReference` instance of the field yourself.
+2. The field is not visible to your editor code.
+3. Your Unity version is Unity 2022.1 or newer.
+
+```cs
+var serializedProp = serializedObject.FindProperty("privateScene");
+
+// read
+var value = serializedProp.boxedValue as SceneReference;
+
+// write
+serializedProp.boxedValue = SceneReference.FromScenePath(/* ... */);
+```
+
+> [!TIP]<br/>
+> `serializedObject` is a field of the `Editor` class. See [here](https://docs.unity3d.com/ScriptReference/Editor-serializedObject.html) for documentation.
+
+### Reflection
+
+Use this option if:
+1. You need to get or set the underlying `SceneReference` instance of the field yourself.
+2. The field is not visible to your editor code.
+3. Your Unity version is older than 2022.1.
+
+```cs
+var fieldInfo = target.GetType().GetField("privateScene", BindingFlags.NonPublic | BindingFlags.Instance);
+
+// get
+var value = fieldInfo.GetValue(target) as SceneReference;
+
+// set
+fieldInfo.SetValue(target, SceneReference.FromScenePath(/* ... */));
+```
 
 # Exceptions
 

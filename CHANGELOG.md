@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Breaking Changes
+
+### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+### Optimised
+
+
+
+## [5.0.0] - 2026-04-12
+
+### Breaking Changes
 - `SceneReference` now implements GUID-based value equality. Two `SceneReference`s are now ruled equal if and only if they reference the same GUID.
 
 ### Added
@@ -18,10 +34,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - `TryGetName` for `Name`.
   - `TryGetLoadedScene` for `LoadedScene`.
   - `TryGetAddress` for `Address`.
-
-### Changed
-
-### Removed
 
 ### Fixed
 - All GUIDs are now compared case-insensitively:
